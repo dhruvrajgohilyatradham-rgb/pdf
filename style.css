@@ -212,6 +212,26 @@ button { font-family: inherit; cursor: pointer; }
 }
 .field textarea { resize: vertical; min-height: 60px; }
 
+.time-select-row { display: flex; gap: 8px; }
+.time-select-row select {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-main);
+  background: var(--white);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.time-select-row select:first-child { flex: 1 1 60%; }
+.time-select-row select:last-child { flex: 1 1 40%; }
+.time-select-row select:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
 .stay-summary {
   margin-top: 16px;
   display: flex;
