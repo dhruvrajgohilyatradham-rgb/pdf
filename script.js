@@ -29,7 +29,7 @@
   --------------------------------------------------------- */
   const state = {
     property: { name: '', url: '', videoUrl: '', reviewUrl: '' },
-    stay: { checkin: '', checkout: '', guests: null },
+    stay: { checkin: '', checkinTime: '14:00', checkout: '', checkoutTime: '11:00', guests: null },
     rooms: [],
     charges: { tax: 5, platform: 17.34 },
     images: [],
@@ -99,11 +99,63 @@
     return (isNeg ? '-' : '') + 'Rs. ' + formattedInt + (decPart ? '.' + decPart : '');
   }
 
+  // Converts a 24-hour "HH:MM" string into { hour12, period } for populating
+  // the hour/AM-PM select pair.
+  function from24Hour(timeStr) {
+    const parts = (timeStr || '').split(':');
+    let h = parseInt(parts[0], 10);
+    if (isNaN(h)) h = 0;
+    const period = h >= 12 ? 'PM' : 'AM';
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return { hour12: h12, period };
+  }
+
+  // Converts a 12-hour value + AM/PM period back into a 24-hour "HH:00"
+  // string for internal state (minutes are always :00 — hour-only picker).
+  function to24Hour(hour12, period) {
+    let h = parseInt(hour12, 10);
+    if (isNaN(h)) h = 12;
+    if (period === 'AM') { if (h === 12) h = 0; } else { if (h !== 12) h += 12; }
+    return `${String(h).padStart(2, '0')}:00`;
+  }
+
+  // Populates an hour/period select pair from a 24-hour "HH:MM" string.
+  function setTimeSelects(hourEl, periodEl, timeStr) {
+    const { hour12, period } = from24Hour(timeStr);
+    if (hourEl) hourEl.value = String(hour12);
+    if (periodEl) periodEl.value = period;
+  }
+
   function formatDatePretty(isoDate) {
     if (!isoDate) return '\u2014';
     const d = new Date(isoDate + 'T00:00:00');
     if (isNaN(d.getTime())) return '\u2014';
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  // Converts a 24-hour "HH:MM" input value into a friendly 12-hour label,
+  // e.g. "14:00" -> "2:00 PM". Returns '' for empty/invalid input so callers
+  // can decide whether to show it at all.
+  function formatTimePretty(timeStr) {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return '';
+    const period = h >= 12 ? 'PM' : 'AM';
+    let h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  }
+
+  // Combines a date and an optional time into one display string, e.g.
+  // "24 Aug 2026, 2:00 PM" or just "24 Aug 2026" if no time is set.
+  function formatDateTimePretty(isoDate, timeStr) {
+    const datePart = formatDatePretty(isoDate);
+    const timePart = formatTimePretty(timeStr);
+    if (!timePart || datePart === '\u2014') return datePart;
+    return `${datePart}, ${timePart}`;
   }
 
   function daysBetween(startIso, endIso) {
@@ -138,7 +190,11 @@
     videoUrl: document.getElementById('videoUrl'),
     reviewUrl: document.getElementById('reviewUrl'),
     checkinDate: document.getElementById('checkinDate'),
+    checkinHour: document.getElementById('checkinHour'),
+    checkinPeriod: document.getElementById('checkinPeriod'),
     checkoutDate: document.getElementById('checkoutDate'),
+    checkoutHour: document.getElementById('checkoutHour'),
+    checkoutPeriod: document.getElementById('checkoutPeriod'),
     guestCount: document.getElementById('guestCount'),
     staySummary: document.getElementById('staySummary'),
     roomsList: document.getElementById('roomsList'),
@@ -420,8 +476,8 @@
     });
 
     el.pvStay.innerHTML = `
-      <div class="stay-block">Check-in<strong>${formatDatePretty(state.stay.checkin)}</strong></div>
-      <div class="stay-block">Check-out<strong>${formatDatePretty(state.stay.checkout)}</strong></div>
+      <div class="stay-block">Check-in<strong>${formatDateTimePretty(state.stay.checkin, state.stay.checkinTime)}</strong></div>
+      <div class="stay-block">Check-out<strong>${formatDateTimePretty(state.stay.checkout, state.stay.checkoutTime)}</strong></div>
       <div class="stay-block">Duration<strong>${totals.nights} night${totals.nights === 1 ? '' : 's'} &bull; ${totals.guests || 0} guest${totals.guests === 1 ? '' : 's'}</strong></div>
     `;
 
@@ -445,11 +501,11 @@
       <tr><td>Room Total</td><td class="ta-r">${formatINR(totals.roomSubtotal)}</td></tr>
       <tr><td>Government Tax (${state.charges.tax || 0}%)</td><td class="ta-r">${formatINR(totals.taxAmount)}</td></tr>
       <tr><td>Platform Charge (${state.charges.platform || 0}%)</td><td class="ta-r">${formatINR(totals.platformAmount)}</td></tr>
-      <tr class="total-row"><td>Final Total</td><td class="ta-r">${formatINR(totals.finalTotal)}</td></tr>
+      <tr class="total-row"><td>GRAND TOTAL</td><td class="ta-r">${formatINR(totals.finalTotal)}</td></tr>
     `;
 
     el.pvFinalTotal.innerHTML = `
-      <div class="label">Final Total</div>
+      <div class="label">GRAND TOTAL</div>
       <div class="amount">${formatINR(totals.finalTotal)}</div>
     `;
 
@@ -470,7 +526,11 @@
     el.reviewUrl.addEventListener('input', () => { state.property.reviewUrl = el.reviewUrl.value; onChange(); });
 
     el.checkinDate.addEventListener('input', () => { state.stay.checkin = el.checkinDate.value; renderRooms(); onChange(); });
+    el.checkinHour.addEventListener('change', () => { state.stay.checkinTime = to24Hour(el.checkinHour.value, el.checkinPeriod.value); onChange(); });
+    el.checkinPeriod.addEventListener('change', () => { state.stay.checkinTime = to24Hour(el.checkinHour.value, el.checkinPeriod.value); onChange(); });
     el.checkoutDate.addEventListener('input', () => { state.stay.checkout = el.checkoutDate.value; renderRooms(); onChange(); });
+    el.checkoutHour.addEventListener('change', () => { state.stay.checkoutTime = to24Hour(el.checkoutHour.value, el.checkoutPeriod.value); onChange(); });
+    el.checkoutPeriod.addEventListener('change', () => { state.stay.checkoutTime = to24Hour(el.checkoutHour.value, el.checkoutPeriod.value); onChange(); });
     el.guestCount.addEventListener('input', () => { state.stay.guests = el.guestCount.value === '' ? null : parseInt(el.guestCount.value, 10); onChange(); });
 
     el.taxPercent.addEventListener('input', () => { state.charges.tax = el.taxPercent.value === '' ? 0 : parseFloat(el.taxPercent.value); onChange(); });
@@ -499,7 +559,7 @@
 
   function resetAll() {
     state.property = { name: '', url: '', videoUrl: '', reviewUrl: '' };
-    state.stay = { checkin: '', checkout: '', guests: null };
+    state.stay = { checkin: '', checkinTime: '14:00', checkout: '', checkoutTime: '11:00', guests: null };
     state.rooms = [];
     state.charges = { tax: 5, platform: 17.34 };
     state.images = [];
@@ -510,7 +570,9 @@
     el.videoUrl.value = '';
     el.reviewUrl.value = '';
     el.checkinDate.value = '';
+    setTimeSelects(el.checkinHour, el.checkinPeriod, '14:00');
     el.checkoutDate.value = '';
+    setTimeSelects(el.checkoutHour, el.checkoutPeriod, '11:00');
     el.guestCount.value = '';
     el.taxPercent.value = 5;
     el.platformPercent.value = 17.34;
@@ -540,14 +602,18 @@
     checkout.setDate(checkout.getDate() + 2);
     state.stay = {
       checkin: inTwoWeeks.toISOString().slice(0, 10),
+      checkinTime: '14:00',
       checkout: checkout.toISOString().slice(0, 10),
+      checkoutTime: '11:00',
       guests: 4
     };
 
     el.propertyName.value = state.property.name;
     el.propertyUrl.value = state.property.url;
     el.checkinDate.value = state.stay.checkin;
+    setTimeSelects(el.checkinHour, el.checkinPeriod, state.stay.checkinTime);
     el.checkoutDate.value = state.stay.checkout;
+    setTimeSelects(el.checkoutHour, el.checkoutPeriod, state.stay.checkoutTime);
     el.guestCount.value = state.stay.guests;
     el.taxPercent.value = state.charges.tax;
     el.platformPercent.value = state.charges.platform;
@@ -796,8 +862,8 @@
       // Stay summary
       const totals = computeTotals();
       const stayBlocks = [
-        { label: 'Check-in', value: formatDatePretty(state.stay.checkin) },
-        { label: 'Check-out', value: formatDatePretty(state.stay.checkout) },
+        { label: 'Check-in', value: formatDateTimePretty(state.stay.checkin, state.stay.checkinTime) },
+        { label: 'Check-out', value: formatDateTimePretty(state.stay.checkout, state.stay.checkoutTime) },
         { label: 'Duration', value: `${totals.nights} night${totals.nights === 1 ? '' : 's'} \u2022 ${totals.guests} guest${totals.guests === 1 ? '' : 's'}` }
       ];
       const blockW = (contentW - 8) / 3;
@@ -829,7 +895,7 @@
       doc.autoTable({
         startY: y,
         margin: { left: marginX, right: marginX, top: TABLE_TOP_MARGIN, bottom: 20 },
-        head: [['Room Type', 'Guests / Room', 'Room Price', 'No. of Rooms', 'Nights', 'Total']],
+        head: [['Room Type', 'Guests / Room', 'Room Price', 'No. of Rooms', 'Nights', 'Room Total']],
         body: roomRows,
         theme: 'grid',
         styles: { font: 'helvetica', fontSize: 9, fontStyle: 'bold', textColor: BRAND.textBody, cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 }, lineColor: BRAND.wine, lineWidth: 0.4 },
@@ -842,14 +908,14 @@
       // Summary table
       const summaryRows = [
         ['Room Total', formatINRPdf(totals.roomSubtotal)],
-        [`Government Tax (${state.charges.tax || 0}%)`, formatINRPdf(totals.taxAmount)],
-        [`Platform Charge (${state.charges.platform || 0}%)`, formatINRPdf(totals.platformAmount)]
+        [`Tax (${state.charges.tax || 0}%)`, formatINRPdf(totals.taxAmount)],
+        ['Platform Charge', formatINRPdf(totals.platformAmount)]
       ];
       doc.autoTable({
         startY: y,
         margin: { left: marginX, right: marginX, top: TABLE_TOP_MARGIN, bottom: 20 },
         body: summaryRows,
-        foot: [['Final Total', formatINRPdf(totals.finalTotal)]],
+        foot: [['GRAND TOTAL', formatINRPdf(totals.finalTotal)]],
         theme: 'grid',
         tableWidth: contentW * 0.62,
         styles: { font: 'helvetica', fontSize: 9.5, fontStyle: 'bold', textColor: BRAND.textBody, cellPadding: 3.5, lineColor: BRAND.wine, lineWidth: 0.4 },
@@ -872,7 +938,7 @@
         body: [
           ['Total Guests', String(totals.guests)],
           ['Total Nights', String(totals.nights)],
-          ['Final Total', formatINRPdf(totals.finalTotal)],
+          ['GRAND TOTAL', formatINRPdf(totals.finalTotal)],
           ['Approx. Per Person', formatINRPdf(totals.perPerson)]
         ],
         theme: 'grid',
@@ -997,6 +1063,30 @@
         doc.text(textLines, marginX + textIndent, ty);
         ty += blockH;
       }
+
+      /* ---------------- DISCLAIMER ---------------- */
+      const disclaimerLabel = 'DISCLAIMER :';
+      const disclaimerText = 'This only Quotation as per your requirements and availability. During booking process may be Price, facility or T&C can be change . that our agent clear while process booking. as well as please read whole quotation properly and if any question or query clear it before booking.';
+      const disclaimerLines = doc.splitTextToSize(disclaimerText, contentW);
+      const disclaimerBlockH = 4 + disclaimerLines.length * 3.6 + 4;
+
+      if (ty + disclaimerBlockH > 280) {
+        doc.addPage();
+        await drawPageHeader(doc, logoAsset, HEADER_H);
+        ty = CONTENT_TOP;
+      } else {
+        ty += 5;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...BRAND.textDesc);
+      doc.text(disclaimerLabel, marginX, ty);
+      ty += 3.6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...BRAND.textDesc);
+      doc.text(disclaimerLines, marginX, ty);
 
       /* ---------------- WATERMARK + FOOTERS ---------------- */
       const totalPages = doc.internal.getNumberOfPages();
