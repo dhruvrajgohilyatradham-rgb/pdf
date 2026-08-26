@@ -864,7 +864,7 @@
       const stayBlocks = [
         { label: 'Check-in', value: formatDateTimePretty(state.stay.checkin, state.stay.checkinTime) },
         { label: 'Check-out', value: formatDateTimePretty(state.stay.checkout, state.stay.checkoutTime) },
-        { label: 'Duration', value: `${totals.nights} night${totals.nights === 1 ? '' : 's'} \u2022 ${totals.guests} guest${totals.guests === 1 ? '' : 's'}` }
+        { label: 'Duration', value: `${totals.nights} Night${totals.nights === 1 ? '' : 's'} \u2022 ${totals.guests} Guest${totals.guests === 1 ? '' : 's'}` }
       ];
       const blockW = (contentW - 8) / 3;
       stayBlocks.forEach((blk, i) => {
@@ -884,46 +884,170 @@
       doc.setTextColor(...BRAND.textMain);
 
       // Room table
-      const roomRows = state.rooms.map((room) => [
-        room.type || '\u2014',
-        `${room.guestsPerRoom || 0} Guests`,
-        formatINRPdf(room.price || 0),
-        String(room.count || 0),
-        String(totals.nights),
-        formatINRPdf(computeRoomSubtotal(room, totals.nights))
-      ]);
-      doc.autoTable({
-        startY: y,
-        margin: { left: marginX, right: marginX, top: TABLE_TOP_MARGIN, bottom: 20 },
-        head: [['Room Type', 'Guests / Room', 'Room Price', 'No. of Rooms', 'Nights', 'Room Total']],
-        body: roomRows,
-        theme: 'grid',
-        styles: { font: 'helvetica', fontSize: 9, fontStyle: 'bold', textColor: BRAND.textBody, cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 }, lineColor: BRAND.wine, lineWidth: 0.4 },
-        headStyles: { fillColor: BRAND.wine, textColor: BRAND.white, fontStyle: 'bold', fontSize: 8.5, lineColor: BRAND.wine, lineWidth: 0.4 },
-        alternateRowStyles: { fillColor: BRAND.bg },
-        columnStyles: { 5: { halign: 'right', fontStyle: 'bold', textColor: BRAND.orangeDark }, 2: { halign: 'right' } }
-      });
-      y = doc.lastAutoTable.finalY + 8;
+const roomRows = state.rooms.map((room) => [
+  room.type || '\u2014',
+  `${room.guestsPerRoom || 0} Guests`,
+  formatINRPdf(room.price || 0),
+  String(room.count || 0),
+  String(totals.nights),
+  formatINRPdf(computeRoomSubtotal(room, totals.nights))
+]);
+
+doc.autoTable({
+  startY: y,
+  margin: {
+    left: marginX,
+    right: marginX,
+    top: TABLE_TOP_MARGIN,
+    bottom: 20
+  },
+
+  head: [[
+    'Room Type',
+    'Guests / Room',
+    'Room Price',
+    'No. of Rooms',
+    'Nights',
+    'Room Total'
+  ]],
+
+  body: roomRows,
+
+  theme: 'grid',
+
+  styles: {
+    font: 'helvetica',
+    fontSize: 9,
+    fontStyle: 'bold',
+    textColor: BRAND.textBody,
+
+    // Vertical center
+    valign: 'middle',
+
+    // Horizontal center
+    halign: 'center',
+
+    cellPadding: {
+      top: 3.5,
+      bottom: 3.5,
+      left: 3,
+      right: 3
+    },
+
+    lineColor: BRAND.wine,
+    lineWidth: 0.4
+  },
+
+  headStyles: {
+    fillColor: BRAND.wine,
+    textColor: BRAND.white,
+    fontStyle: 'bold',
+    fontSize: 8.5,
+
+    // Center header text
+    halign: 'center',
+    valign: 'middle',
+
+    lineColor: BRAND.wine,
+    lineWidth: 0.4
+  },
+
+  alternateRowStyles: {
+    fillColor: BRAND.bg
+  },
+
+  columnStyles: {
+    // Keep EVERY column centered
+    0: {
+      halign: 'center',
+      valign: 'middle'
+    },
+    1: {
+      halign: 'center',
+      valign: 'middle'
+    },
+    2: {
+      halign: 'center',
+      valign: 'middle'
+    },
+    3: {
+      halign: 'center',
+      valign: 'middle'
+    },
+    4: {
+      halign: 'center',
+      valign: 'middle'
+    },
+    5: {
+      halign: 'center',
+      valign: 'middle',
+      fontStyle: 'bold',
+      textColor: BRAND.orangeDark
+    }
+  }
+});
+
+y = doc.lastAutoTable.finalY + 8;
 
       // Summary table
-      const summaryRows = [
-        ['Room Total', formatINRPdf(totals.roomSubtotal)],
-        [`Tax (${state.charges.tax || 0}%)`, formatINRPdf(totals.taxAmount)],
-        ['Platform Charge', formatINRPdf(totals.platformAmount)]
-      ];
-      doc.autoTable({
-        startY: y,
-        margin: { left: marginX, right: marginX, top: TABLE_TOP_MARGIN, bottom: 20 },
-        body: summaryRows,
-        foot: [['GRAND TOTAL', formatINRPdf(totals.finalTotal)]],
-        theme: 'grid',
-        tableWidth: contentW * 0.62,
-        styles: { font: 'helvetica', fontSize: 9.5, fontStyle: 'bold', textColor: BRAND.textBody, cellPadding: 3.5, lineColor: BRAND.wine, lineWidth: 0.4 },
-        columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right', fontStyle: 'bold', textColor: BRAND.wine } },
-        alternateRowStyles: { fillColor: BRAND.bg },
-        footStyles: { fillColor: BRAND.cream, textColor: BRAND.wine, fontStyle: 'bold', fontSize: 12.5, lineWidth: 0.5, lineColor: BRAND.orange }
-      });
-      y = doc.lastAutoTable.finalY + 10;
+const summaryRows = [
+  ['Room Total', formatINRPdf(totals.roomSubtotal)],
+  [`GST Tax (${state.charges.tax || 0}%)`, formatINRPdf(totals.taxAmount)],
+  ['Platform Charge', formatINRPdf(totals.platformAmount)],
+  ['GRAND TOTAL', formatINRPdf(totals.finalTotal)]
+];
+
+doc.autoTable({
+  startY: y,
+  margin: {
+    left: marginX,
+    right: marginX,
+    top: TABLE_TOP_MARGIN,
+    bottom: 20
+  },
+  body: summaryRows,
+  theme: 'grid',
+  tableWidth: contentW * 0.62,
+
+  styles: {
+    font: 'helvetica',
+    fontSize: 9.5,
+    fontStyle: 'bold',
+    textColor: BRAND.textBody,
+    cellPadding: 3.5,
+    lineColor: BRAND.wine,
+    lineWidth: 0.4
+  },
+
+  columnStyles: {
+    0: {
+      fontStyle: 'bold'
+    },
+    1: {
+      halign: 'right',
+      fontStyle: 'bold',
+      textColor: BRAND.wine
+    }
+  },
+
+  alternateRowStyles: {
+    fillColor: BRAND.bg
+  },
+
+  // Style only the GRAND TOTAL row
+  didParseCell: function (data) {
+    if (data.section === 'body' && data.row.index === summaryRows.length - 1) {
+      data.cell.styles.fillColor = BRAND.cream;
+      data.cell.styles.textColor = BRAND.wine;
+      data.cell.styles.fontStyle = 'bold';
+      data.cell.styles.fontSize = 10.5;
+      data.cell.styles.lineColor = BRAND.orange;
+      data.cell.styles.lineWidth = 0.5;
+    }
+  }
+});
+
+y = doc.lastAutoTable.finalY + 10;
 
       // Per-person table
       doc.setFont('helvetica', 'bold');
